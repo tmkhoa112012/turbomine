@@ -1,0 +1,265 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="robots" content="noindex, nofollow">
+<title>TurboMines Console</title>
+<style>
+  :root{
+    --bg:#14110f; --panel:#1d1815; --panel-2:#241d18; --line:#332a22;
+    --text:#eee6da; --muted:#9c8f7d; --amber:#e2a23b; --amber-dim:#7a5a26;
+    --red:#c0553f; --green:#5f9e6c;
+    --mono: "JetBrains Mono","SFMono-Regular",Consolas,monospace;
+    --sans: "Space Grotesk", ui-sans-serif, system-ui, sans-serif;
+  }
+  *{box-sizing:border-box;}
+  body{
+    margin:0; min-height:100vh; background:
+      radial-gradient(1200px 600px at 15% -10%, #241a10 0%, transparent 60%),
+      var(--bg);
+    color:var(--text); font-family:var(--sans);
+  }
+  .wrap{max-width:880px; margin:0 auto; padding:48px 20px 80px;}
+  header{display:flex; align-items:baseline; gap:14px; margin-bottom:36px;}
+  .mark{width:11px; height:11px; border-radius:2px; background:var(--amber); transform:rotate(45deg); flex:none;}
+  h1{font-size:20px; font-weight:600; letter-spacing:.2px; margin:0;}
+  .sub{color:var(--muted); font-size:13px; margin-top:2px;}
+
+  .panel{background:var(--panel); border:1px solid var(--line); border-radius:10px; padding:28px; margin-bottom:20px;}
+  .panel h2{font-size:15px; font-weight:600; margin:0 0 6px;}
+  .panel p.desc{color:var(--muted); font-size:13px; line-height:1.6; margin:0 0 20px;}
+
+  .btn{
+    appearance:none; border:1px solid var(--amber-dim); background:var(--amber);
+    color:#1a1310; font-weight:600; font-size:13.5px; padding:10px 18px;
+    border-radius:7px; cursor:pointer; font-family:var(--sans);
+  }
+  .btn:hover{filter:brightness(1.06);}
+  .btn:disabled{opacity:.45; cursor:not-allowed;}
+  .btn.ghost{background:transparent; color:var(--text); border-color:var(--line);}
+  .btn.stop{background:var(--red); border-color:#7a3527; color:#fff0ec;}
+
+  label{display:block; font-size:12.5px; color:var(--muted); margin:0 0 6px;}
+  input[type=text], input[type=number], select, textarea{
+    width:100%; background:var(--panel-2); border:1px solid var(--line); color:var(--text);
+    border-radius:6px; padding:9px 11px; font-family:var(--mono); font-size:13px;
+  }
+  textarea{min-height:78px; resize:vertical;}
+  .row{display:grid; grid-template-columns:repeat(4,1fr); gap:14px; margin:16px 0;}
+  .row.two{grid-template-columns:repeat(2,1fr);}
+  .field{margin-bottom:0;}
+
+  .keylink{
+    display:inline-block; margin:14px 0; padding:10px 14px; background:var(--panel-2);
+    border:1px dashed var(--amber-dim); border-radius:7px; color:var(--amber);
+    font-family:var(--mono); font-size:13px; text-decoration:none; word-break:break-all;
+  }
+  .err{color:var(--red); font-size:13px; margin-top:10px; min-height:1em;}
+  .ok{color:var(--green); font-size:13px; margin-top:10px;}
+
+  .stats{display:flex; gap:22px; margin:4px 0 16px; font-size:13px;}
+  .stats span b{color:var(--text); font-family:var(--mono);}
+  .stats .w b{color:var(--green);} .stats .l b{color:var(--red);}
+  .dot{display:inline-block; width:7px; height:7px; border-radius:50%; margin-right:7px;}
+  .dot.on{background:var(--green); box-shadow:0 0 6px var(--green);}
+  .dot.off{background:#544c42;}
+
+  #log{
+    background:#0f0c0a; border:1px solid var(--line); border-radius:8px; padding:14px;
+    height:320px; overflow-y:auto; font-family:var(--mono); font-size:12.5px;
+    line-height:1.65; color:#c9bfae; white-space:pre-wrap;
+  }
+  #log div.hit{color:var(--red);}
+  #log div.win{color:var(--green);}
+
+  .hidden{display:none !important;}
+  footer{color:var(--muted); font-size:11.5px; margin-top:28px; line-height:1.7;}
+  a.foot{color:var(--muted);}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div class="mark"></div>
+    <div>
+      <h1>TurboMines Console</h1>
+      <div class="sub">turbogg4u · auto-play server-side</div>
+    </div>
+  </header>
+
+  <!-- ===== KEY GATE ===== -->
+  <div id="gate" class="panel">
+    <h2>Xác thực</h2>
+    <p class="desc">Key hạn 24h, dùng 1 lần cho tới khi hết hạn. Bấm lấy key để nhận link.</p>
+    <button class="btn" id="btnReqKey">Lấy key</button>
+    <div id="keyLinkWrap"></div>
+    <div id="verifyWrap" class="hidden row two" style="margin-top:14px;">
+      <div class="field">
+        <label>Nhập key</label>
+        <input type="text" id="keyInput" placeholder="Dán key vào đây">
+      </div>
+      <div class="field" style="align-self:end;">
+        <button class="btn" id="btnVerify">Xác thực</button>
+      </div>
+    </div>
+    <div class="err" id="gateErr"></div>
+  </div>
+
+  <!-- ===== DASHBOARD ===== -->
+  <div id="dash" class="hidden">
+    <div class="panel">
+      <h2>Cấu hình phiên chạy</h2>
+      <p class="desc">Dán profile JSON (token / cid / gameId / visitorId), chọn map và thông số rồi bấm chạy.</p>
+
+      <label>Profile JSON</label>
+      <textarea id="profile" placeholder='{"token":"...","cid":"...","gameId":"...","visitorId":"..."}'></textarea>
+
+      <div class="row">
+        <div class="field">
+          <label>Map</label>
+          <select id="map">
+            <option value="3x3">3x3</option>
+            <option value="5x5" selected>5x5</option>
+            <option value="7x7">7x7</option>
+            <option value="9x9">9x9</option>
+          </select>
+        </div>
+        <div class="field"><label>Số bom</label><input type="number" id="mines" value="3"></div>
+        <div class="field"><label>Số ô mở/ván</label><input type="number" id="cells" value="3"></div>
+        <div class="field"><label>Cược/ván</label><input type="number" id="amount" value="100"></div>
+      </div>
+      <div class="row two">
+        <div class="field"><label>Tổng số ván</label><input type="number" id="rounds" value="5"></div>
+      </div>
+
+      <div style="margin-top:18px; display:flex; gap:10px;">
+        <button class="btn" id="btnStart">▶ Chạy</button>
+        <button class="btn stop hidden" id="btnStop">■ Dừng</button>
+      </div>
+      <div class="err" id="startErr"></div>
+    </div>
+
+    <div class="panel">
+      <h2><span class="dot off" id="runDot"></span>Log phiên chạy</h2>
+      <div class="stats">
+        <span class="w">Thắng <b id="statWins">0</b></span>
+        <span class="l">Thua <b id="statLosses">0</b></span>
+      </div>
+      <div id="log"></div>
+    </div>
+  </div>
+
+  <footer>
+    Toàn bộ logic đặt cược chạy trên server, trình duyệt chỉ nhận dòng log text —
+    xem "view source" cũng không thấy thuật toán.
+  </footer>
+</div>
+
+<script>
+// Toàn bộ JS ở đây CHỈ gọi API và vẽ UI — không có bất kỳ logic đặt cược nào.
+let sinceSeq = 0, pollTimer = null;
+
+async function api(path, opts) {
+  const r = await fetch(path, Object.assign({headers:{"Content-Type":"application/json"}}, opts||{}));
+  let data = {};
+  try { data = await r.json(); } catch(e) {}
+  data._status = r.status;
+  return data;
+}
+
+function show(el, yes){ el.classList.toggle("hidden", !yes); }
+
+async function refreshState(){
+  const st = await api("/api/state");
+  if (st.authed) {
+    show(document.getElementById("gate"), false);
+    show(document.getElementById("dash"), true);
+    setRunning(st.running);
+    startPolling();
+  } else {
+    show(document.getElementById("gate"), true);
+    show(document.getElementById("dash"), false);
+  }
+}
+
+function setRunning(running){
+  document.getElementById("runDot").className = "dot " + (running ? "on" : "off");
+  show(document.getElementById("btnStart"), !running);
+  show(document.getElementById("btnStop"), running);
+}
+
+document.getElementById("btnReqKey").onclick = async () => {
+  const errEl = document.getElementById("gateErr");
+  errEl.textContent = "";
+  const res = await api("/api/request-key", {method:"POST"});
+  if (!res.ok) { errEl.textContent = res.error || "Lỗi không rõ"; return; }
+  document.getElementById("keyLinkWrap").innerHTML =
+    '<a class="keylink" href="' + res.url + '" target="_blank" rel="noopener">' + res.url + '</a>';
+  if (res.warning) errEl.textContent = res.warning;
+  show(document.getElementById("verifyWrap"), true);
+};
+
+document.getElementById("btnVerify").onclick = async () => {
+  const errEl = document.getElementById("gateErr");
+  const key = document.getElementById("keyInput").value.trim();
+  const res = await api("/api/verify-key", {method:"POST", body: JSON.stringify({key})});
+  if (!res.ok) { errEl.textContent = res.error || "Key không đúng"; return; }
+  errEl.textContent = "";
+  await refreshState();
+};
+
+document.getElementById("btnStart").onclick = async () => {
+  const errEl = document.getElementById("startErr");
+  errEl.textContent = "";
+  let profile;
+  try { profile = JSON.parse(document.getElementById("profile").value); }
+  catch(e) { errEl.textContent = "Profile JSON không hợp lệ"; return; }
+
+  const body = {
+    profile,
+    map: document.getElementById("map").value,
+    mines: parseInt(document.getElementById("mines").value || "3", 10),
+    cells: parseInt(document.getElementById("cells").value || "3", 10),
+    amount: parseInt(document.getElementById("amount").value || "100", 10),
+    rounds: parseInt(document.getElementById("rounds").value || "5", 10),
+  };
+  const res = await api("/api/start", {method:"POST", body: JSON.stringify(body)});
+  if (!res.ok) { errEl.textContent = res.error || "Không chạy được"; return; }
+  sinceSeq = 0;
+  document.getElementById("log").innerHTML = "";
+  setRunning(true);
+};
+
+document.getElementById("btnStop").onclick = async () => {
+  await api("/api/stop", {method:"POST"});
+};
+
+function appendLog(lines){
+  const box = document.getElementById("log");
+  for (const line of lines) {
+    const div = document.createElement("div");
+    if (line.includes("DÍNH BOM") || line.includes("lỗi")) div.className = "hit";
+    else if (line.includes("thắng") && line.startsWith("[bot] Tổng")) div.className = "win";
+    div.textContent = line;
+    box.appendChild(div);
+  }
+  box.scrollTop = box.scrollHeight;
+}
+
+function startPolling(){
+  if (pollTimer) return;
+  pollTimer = setInterval(async () => {
+    const res = await api("/api/logs?since=" + sinceSeq);
+    if (!res.ok) return;
+    if (res.logs && res.logs.length) { appendLog(res.logs); sinceSeq = res.seq; }
+    document.getElementById("statWins").textContent = res.wins ?? 0;
+    document.getElementById("statLosses").textContent = res.losses ?? 0;
+    setRunning(res.running);
+  }, 1200);
+}
+
+refreshState();
+</script>
+</body>
+</html>
